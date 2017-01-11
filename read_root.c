@@ -77,9 +77,18 @@ int main() {
     Fat16BootSector bs;
     Fat16Entry entry;
     
+    printf("Go to partition table in Master Boot Record (MBR), ");
     fseek(in, 0x1BE, SEEK_SET); // go to partition table start
+    printf("now at 0x%X\n", ftell(in));
+
     fread(pt, sizeof(PartitionTable), 4, in); // read all four entries
-    
+    for(i=0; i<4; i++) {
+		printf("Partition %d, type 0x%02X\n", i, pt[i].partition_type);
+		printf("  Start sector 0x%08X, %d sectors long\n",
+				pt[i].start_sector, pt[i].length_sectors);
+	}
+    printf("\n");
+
     for(i=0; i<4; i++) {        
         if(pt[i].partition_type == 4 || pt[i].partition_type == 6 ||
            pt[i].partition_type == 14) {
@@ -93,21 +102,50 @@ int main() {
         return -1;
     }
     
+    printf("Go to FAT16 boot sector = start sector * 512 = 0x%08X * 512, ", pt[i].start_sector);
     fseek(in, 512 * pt[i].start_sector, SEEK_SET);
+    printf("now at 0x%X\n", ftell(in));
     fread(&bs, sizeof(Fat16BootSector), 1, in);	// fread will advance the file position indicator for the stream by the number of chars read.
-    
-    printf("Now at 0x%X, sector size %d, FAT size %d sectors, %d FATs\n\n", 
-           ftell(in), bs.sector_size, bs.fat_size_sectors, bs.number_of_fats);
-           
+    printf("Boot sector read, now at 0x%X, sector size %d, FAT size %d sectors, %d FATs\n",
+    		ftell(in), bs.sector_size, bs.fat_size_sectors, bs.number_of_fats);
+    printf("<Boot sector>\n");
+    printf("  Jump code: %02X:%02X:%02X\n", bs.jmp[0], bs.jmp[1], bs.jmp[2]);
+	printf("  OEM code: [%.8s]\n", bs.oem);
+	printf("  sector_size: %d\n", bs.sector_size);
+	printf("  sectors_per_cluster: %d\n", bs.sectors_per_cluster);
+	printf("  reserved_sectors: %d\n", bs.reserved_sectors);
+	printf("  number_of_fats: %d\n", bs.number_of_fats);
+	printf("  root_dir_entries: %d\n", bs.root_dir_entries);
+	printf("  total_sectors_short: %d\n", bs.total_sectors_short);
+	printf("  media_descriptor: 0x%02X\n", bs.media_descriptor);
+	printf("  fat_size_sectors: %d\n", bs.fat_size_sectors);
+	printf("  sectors_per_track: %d\n", bs.sectors_per_track);
+	printf("  number_of_heads: %d\n", bs.number_of_heads);
+	printf("  hidden_sectors: %d\n", bs.hidden_sectors);
+	printf("  total_sectors_long: %d\n", bs.total_sectors_long);
+	printf("  drive_number: 0x%02X\n", bs.drive_number);
+	printf("  current_head: 0x%02X\n", bs.current_head);
+	printf("  boot_signature: 0x%02X\n", bs.boot_signature);
+	printf("  volume_id: 0x%08X\n", bs.volume_id);
+	printf("  Volume label: [%.11s]\n", bs.volume_label);
+	printf("  Filesystem type: [%.8s]\n", bs.fs_type);
+	printf("  Boot sector signature: 0x%04X\n", bs.boot_sector_signature);
+	printf("\n");
+
+    printf("Go to root directory = current pos + (NO.reserved sectors-1 + sectors in FAT*NO.FAT) * sector size = 0x%X + (%d-1 + %d*%d) * %d, ",
+    		ftell(in), bs.reserved_sectors, bs.fat_size_sectors, bs.number_of_fats, bs.sector_size);
     fseek(in, (bs.reserved_sectors-1 + bs.fat_size_sectors * bs.number_of_fats) *
           bs.sector_size, SEEK_CUR);
-        
+    printf("now at 0x%X\n", ftell(in));
+
+    printf("Root directory has %d entries, 32 bytes/entry\n", bs.root_dir_entries);
     for(i=0; i<bs.root_dir_entries; i++) {
         fread(&entry, sizeof(entry), 1, in);
         print_file_info(&entry);
+//        printf("now at 0x%X\n", ftell(in));
     }
+    printf("\nRoot directory read, now at 0x%X which contains data\n", ftell(in));
     
-    printf("\nRoot directory read, now at 0x%X\n", ftell(in));
     fclose(in);
     return 0;
 }
